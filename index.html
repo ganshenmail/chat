@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+    <title>Chat</title>
+    <link rel="stylesheet" href="https://cdn.staticfile.net/uikit/3.17.11/css/uikit.min.css">
+</head>
+
+<body>
+    <button class="uk-button uk-button-primary" style="position: fixed;right: 10px;top: 10px"
+        id="copy">Link</button>
+    <div id="messages" style="padding:10px;margin-bottom:100px;"></div>
+    <form id="form" style="position: fixed;bottom:0;" class="uk-width-1-1">
+        <input class="uk-input uk-width-1-1" id="input" type="text" placeholder="Enter Message">
+        <button class="uk-button uk-button-primary uk-width-1-1" type="submit">Send</button>
+    </form>
+    <script src="https://cdn.staticfile.net/socket.io/4.8.1/socket.io.min.js"></script>
+    <script src="https://cdn.staticfile.net/crypto-js/4.2.0/crypto-js.min.js"></script>
+    <script>
+        let room = getQueryParam('r')
+        let key = getQueryParam('k')
+
+        if (!room) room = generateUUID();
+        if (!key) key = generateRandomHex();
+
+        history.replaceState({}, '', `?r=${room}&k=${key}`);
+
+        let name = 'Anonymous'
+
+        name = window.prompt('Name', name);
+
+        document.getElementById('copy').addEventListener('click', ()=>{
+            let textToCopy = window.location.href;
+            link(textToCopy);
+        });
+
+
+        function link(textToCopy) {
+            const textArea = document.createElement('textarea');
+            textArea.value = textToCopy;
+            document.body.appendChild(textArea);
+            textArea.select();
+            textArea.setSelectionRange(0, 99999);
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+            alert('Copied');
+        }
+
+
+        function getQueryParam(paramName) {
+            const queryString = window.location.search;
+            const params = new URLSearchParams(queryString);
+            return params.get(paramName);
+        }
+
+        function generateRandomHex() {
+            let hex = '';
+            const characters = '0123456789ABCDEF';
+            for (let i = 0; i < 32; i++) {
+                hex += characters.charAt(Math.floor(Math.random() * characters.length));
+            }
+            return hex;
+        }
+
+        function encrypt(text) {
+            const encrypted = CryptoJS.AES.encrypt(text, key).toString();
+            return encrypted;
+        }
+
+        function decrypt(encryptedText) {
+            const bytes = CryptoJS.AES.decrypt(encryptedText, key);
+            const decrypted = bytes.toString(CryptoJS.enc.Utf8);
+            return decrypted;
+        }
+
+        function generateUUID() {
+            return ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, c =>
+                (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
+            );
+        }
+
+        function getdate() {
+            const currentDate = new Date();
+            const hours = String(currentDate.getHours()).padStart(2, '0');
+            const minutes = String(currentDate.getMinutes()).padStart(2, '0');
+            const seconds = String(currentDate.getSeconds()).padStart(2, '0');
+            const formattedTime = `${hours}:${minutes}:${seconds}`;
+            return formattedTime;
+        }
+
+        const socket = io('/', { auth: { room: room }, transports: ["websocket"] });
+        const form = document.getElementById('form');
+        const input = document.getElementById('input');
+        const messages = document.getElementById('messages');
+
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            if (input.value) {
+                data = JSON.stringify({ name: name, messages: input.value })
+                const encrypted = encrypt(data);
+                socket.emit('chat', encrypted);
+                input.value = '';
+            }
+        });
+
+        socket.on('chat', (msg) => {
+            const data = decrypt(msg);
+            if (data == '') return false;
+            const json = JSON.parse(data);
+            if (!json) return false;
+            color = '#000'
+            if (json.name != name) {
+                color = '#f00'
+            }
+            const meta = document.createElement('div');
+            const content = document.createElement('div');
+            const hr = document.createElement('hr');
+            meta.innerHTML = '<strong>' + getdate() + ' ' + '<span style="color:' + color + '">' + json.name + '</span></strong>';
+            content.innerText = json.messages;
+            messages.appendChild(meta);
+            messages.appendChild(content);
+            messages.appendChild(hr);
+            window.scrollTo(0, document.body.scrollHeight);
+        });
+
+        socket.on('error', (error) => {
+            console.log(error)
+        })
+
+    </script>
+</body>
+
+</html>
