@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0,user-scalable=no">
+    <title>-</title>
+    <link rel="stylesheet" href="css/uikit.min.css">
+    <style>
+        body {
+            background-color: #EEE;
+        }
+
+        .msg-white {
+            background-color: #FFF;
+            color: #000;
+            border-radius: 5px;
+            display: inline-block;
+        }
+
+        .msg-green {
+            background-color: #0A0;
+            color: #FFF;
+            border-radius: 5px;
+            display: inline-block;
+        }
+    </style>
+    <script src="js/uikit.min.js"></script>
+    <script src="js/mqtt.min.js"></script>
+    <script src="js/crypto-js.min.js"></script>
+</head>
+
+<body style="overflow:auto;">
+    <div id="content" class="uk-padding-small" uk-height-viewport style="padding-bottom: 50px;">
+    </div>
+    <div class="uk-position-bottom uk-position-fixed">
+        <div class="uk-flex">
+            <div class="uk-flex-1"><input class="uk-input" type="text" placeholder="Please enter the message" id="msg">
+            </div>
+            <div><button class="uk-button uk-button-primary" id="sendpic">+</button></div>
+        </div>
+    </div>
+</body>
+<script>
+
+    const name = window.prompt('Nickname', 'Anonymous')
+    const room = window.prompt('RoomNo', 'abc-123')
+
+    const topic = '250cf8b51c773f3f8dc8b4be867a9a02' + room
+    const key = '250cf8b51c773f3f8dc8b4be867a9a02' + room
+    const clientid = Math.random().toString(16)
+
+    const url = 'wss://broker.emqx.io:8084/mqtt'
+    const options = {
+        clean: true,
+        clientId: clientid
+    }
+
+    function now() {
+        const currentDate = new Date();
+        const years = currentDate.getFullYear();
+        const months = String(currentDate.getMonth() + 1).padStart(2, '0');
+        const days = String(currentDate.getDate()).padStart(2, '0');
+        const hours = String(currentDate.getHours()).padStart(2, '0');
+        const minutes = String(currentDate.getMinutes()).padStart(2, '0');
+        const seconds = String(currentDate.getSeconds()).padStart(2, '0');
+        const formattedTime = `${years}-${months}-${days} ${hours}:${minutes}:${seconds}`;
+        return formattedTime;
+    }
+
+    function encrypt(text) {
+        const encrypted = CryptoJS.AES.encrypt(text, key).toString();
+        return encrypted;
+    }
+
+    function decrypt(encryptedText) {
+        const bytes = CryptoJS.AES.decrypt(encryptedText, key);
+        const decrypted = bytes.toString(CryptoJS.enc.Utf8);
+        return decrypted;
+    }
+
+    function send(data) {
+        client.publish(topic, encrypt(data))
+    }
+
+
+    const client = mqtt.connect(url, options)
+
+    client.on('connect', function () {
+
+        client.subscribe(topic, function (err) {
+            if (!err) {
+                send(`{"name":"${name}","msg":"${name} joined the room","clientid":"${clientid}"}`)
+            }
+        })
+
+    })
+
+    client.on('message', function (topic, message) {
+
+        const msg = message.toString()
+
+        const json = JSON.parse(decrypt(msg))
+        let imsg = ''
+        const time = now()
+        if (json.msg.indexOf('data:image') == 0) {
+            json.msg = `<img src="${json.msg}" style="width:200px" >`
+        }
+        if (json.clientid == clientid) {
+            imsg = `
+                <div class="uk-text-right">
+                    <div class="uk-text-right">${json.name}<br>${time}</div>
+                    <div class="uk-text-left uk-padding-small uk-margin-small msg-green" style="max-width:50%;">${json.msg}</div>
+                </div>
+                `
+            document.getElementById('content').innerHTML += imsg
+        } else {
+            imsg = `
+            <div class="uk-text-left">
+                <div class="uk-text-left">${json.name}<br>${time}</div>
+                <div class="uk-text-left uk-padding-small uk-margin-small msg-white">${json.msg}</div>
+            </div>
+            `
+            document.getElementById('content').innerHTML += imsg
+        }
+
+        window.scrollTo({
+            top: document.body.scrollHeight,
+            behavior: 'smooth'
+        });
+
+    })
+
+
+    document.getElementById('sendpic').onclick = function () {
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = 'image/*';
+        fileInput.onchange = function (e) {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = function (e) {
+
+                const base64 = e.target.result;
+                send(`{"name":"${name}","msg":"${base64}","clientid":"${clientid}"}`)
+            }
+            reader.readAsDataURL(file);
+        }
+        fileInput.click();
+    }
+
+    document.getElementById('msg').onkeydown = function (e) {
+        if (e.keyCode == 13) {
+            publish()
+        }
+    }
+
+    function publish() {
+        const msg = document.getElementById('msg').value
+        if (msg == '') {
+            return
+        }
+        send(`{"name":"${name}","msg":"${msg}","clientid":"${clientid}"}`)
+        document.getElementById('msg').value = ''
+    }
+
+
+
+</script>
+
+</html>
