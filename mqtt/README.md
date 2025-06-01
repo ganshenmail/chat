@@ -1,1 +1,1 @@
-A chat room built using a public MQTT server does not require a self built WebSocket server. The client is AES encrypted and can send pictures.
+使用公共MQTT服务器实现加密聊天室，可以发图片，但MQTT服务器可能会限制大小，建议图片大小不超过100K。仅供学习使用，不要在产品中使用。
