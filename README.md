@@ -1,1 +1,1 @@
-Client-side AES encrypted chat
+使用socket.io实现的加密聊天室，仅供学习，请勿使用在产品中。
